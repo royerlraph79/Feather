@@ -225,13 +225,13 @@ extension SigningView {
 						options: $_temporaryOptions.optional()
 					)
 				}
-				#if NIGHTLY || DEBUG
-					NavigationLink(.localized("Entitlements") + " (BETA)") {
+
+					NavigationLink(.localized("Entitlements")) {
 						SigningEntitlementsView(
 							bindingValue: $_temporaryOptions.appEntitlementsFile
 						)
 					}
-				#endif
+
 				NavigationLink(.localized("Tweaks")) {
 					SigningTweaksView(
 						options: $_temporaryOptions
