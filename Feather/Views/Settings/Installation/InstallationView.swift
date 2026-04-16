@@ -15,7 +15,7 @@ struct InstallationView: View {
 
 	private let _installationMethods: [String] = [
 		.localized("Server"),
-		.localized("idevice")
+		.localized("iDevice")
 	]
 	
 	// MARK: Body
@@ -28,7 +28,7 @@ struct InstallationView: View {
 					}
 				}
 			} footer: {
-				Text(.localized("Server (Recommended):\nUses a locally hosted server and itms-services:// to install applications.\n\nIDevice (advanced):\nUses a VPN and a pairing file. Writes to AFC and manually calls installd, while monitoring install progress by using a callback\nAdvantage: It is very reliable, does not need SSL certificates or a externally hosted server. Rather, works similarly to a computer."))
+				Text(.localized("Server (Recommended):\nUses a locally hosted server and itms-services:// to install applications.\n\niDevice (Advanced):\nUses a VPN and a pairing file. Writes to AFC and manually calls installd, while monitoring install progress by using a callback\nAdvantage: It is very reliable, does not need SSL certificates or a externally hosted server. Rather, works similarly to a computer."))
 			}
 			
 			if _installationMethod == 0 {
