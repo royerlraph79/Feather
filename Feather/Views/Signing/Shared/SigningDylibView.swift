@@ -12,11 +12,11 @@ import ZsignSwift
 // MARK: - View
 struct SigningDylibView: View {
     @State private var _dylibs: [String] = []
-    @State private var _hiddenDylibCount: Int = 0
-    
+    @State private var _systemDylibs: [String] = []
+
     var app: AppInfoPresentable
     @Binding var options: Options?
-    
+
     var body: some View {
         NBList(.localized("Dylibs"), type: .list) {
             Section {
@@ -29,12 +29,18 @@ struct SigningDylibView: View {
                 }
             }
             .disabled(options == nil)
-            
-            // Hidden section kept but now always shows 0 (optional: you can delete this whole block)
-            NBSection(.localized("Hidden")) {
-                Text(verbatim: .localized("%lld required system dylibs not shown.", arguments: _hiddenDylibCount))
-                    .font(.footnote)
-                    .foregroundColor(.disabled())
+
+            if !_systemDylibs.isEmpty {
+                NBSection("System Dylibs (\(_systemDylibs.count))") {
+                    ForEach(_systemDylibs, id: \.self) { dylib in
+                        SigningToggleCellView(
+                            title: dylib,
+                            options: $options,
+                            arrayKeyPath: \.disInjectionFiles
+                        )
+                    }
+                }
+                .disabled(options == nil)
             }
         }
         .onAppear(perform: _loadDylibs)
@@ -45,14 +51,18 @@ struct SigningDylibView: View {
 extension SigningDylibView {
     private func _loadDylibs() {
         guard let path = Storage.shared.getAppDirectory(for: app) else { return }
-        
+
         let bundle = Bundle(url: path)
         let execPath = path.appendingPathComponent(bundle?.exec ?? "").relativePath
-        
+
         let allDylibs = Zsign.listDylibs(appExecutable: execPath).map { $0 as String }
-        
-        // ✅ Show ALL dylibs (no filtering)
-        _dylibs = allDylibs
-        _hiddenDylibCount = 0
+
+        _dylibs = allDylibs.filter {
+            $0.hasPrefix("@rpath") || $0.hasPrefix("@executable_path")
+        }
+
+        _systemDylibs = allDylibs.filter {
+            !$0.hasPrefix("@rpath") && !$0.hasPrefix("@executable_path")
+        }
     }
 }
