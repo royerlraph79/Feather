@@ -21,15 +21,16 @@ struct FeatherApp: App {
 	
 	var body: some Scene {
 		WindowGroup {
-			VStack {
+			VStack(spacing: 0) {
 				DownloadHeaderView(downloadManager: downloadManager)
-					.transition(.move(edge: .top).combined(with: .opacity))
+				// No ambient animation out here: an .animation on this VStack also
+				// animates the tab view's resize when the header appears, and a
+				// TabView that resizes mid-tab-swap cross-dissolves the two tabs
+				// over each other. DownloadHeaderView animates its own insertion.
 				VariedTabbarView()
 					.environment(\.managedObjectContext, storage.context)
 					.onOpenURL(perform: _handleURL)
-					.transition(.move(edge: .top).combined(with: .opacity))
 			}
-			.animation(.smooth, value: downloadManager.manualDownloads.description)
 			.onReceive(NotificationCenter.default.publisher(for: .heartbeatInvalidHost)) { _ in
 				DispatchQueue.main.async {
 					UIAlertController.showAlertWithOk(
