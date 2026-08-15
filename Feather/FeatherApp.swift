@@ -21,37 +21,41 @@ struct FeatherApp: App {
 	
 	var body: some Scene {
 		WindowGroup {
-			VariedTabbarView()
-				.environment(\.managedObjectContext, storage.context)
-				.onOpenURL(perform: _handleURL)
-				// Overlaid, not stacked above. As a sibling in a VStack the header
-				// got its own opaque strip with nothing behind it, so its glass had
-				// nothing to refract and read as a flat dark band against the glass
-				// chrome below it. Overlaying puts the tab content behind it.
-				//
-				// It also keeps the header from resizing the tab view: a TabView
-				// that resizes while it swaps tabs cross-dissolves the two tabs over
-				// each other. DownloadHeaderView animates its own insertion, so no
-				// ambient .animation belongs out here either.
-				.overlay(alignment: .top) {
-					DownloadHeaderView(downloadManager: downloadManager)
+			// Stacked, not overlaid. Overlaying let the tab content show through the
+			// header's glass, but it also covered the navigation bar -- Edit, the
+			// refresh and add buttons, and the search field all sat underneath it and
+			// could not be tapped. safeAreaInset does not help: applied to this
+			// TabView it leaves the navigation bar where it is and behaves like an
+			// overlay, because the bar positions itself against the window's safe
+			// area rather than the tab view's. Stacking is what actually moves the
+			// bar down out of the way.
+			//
+			// No ambient .animation out here: one on this VStack also animates the
+			// tab view's resize when the header appears, and a TabView that resizes
+			// mid-tab-swap cross-dissolves the two tabs over each other.
+			// DownloadHeaderView animates its own insertion.
+			VStack(spacing: 0) {
+				DownloadHeaderView(downloadManager: downloadManager)
+				VariedTabbarView()
+					.environment(\.managedObjectContext, storage.context)
+					.onOpenURL(perform: _handleURL)
+			}
+			.onReceive(NotificationCenter.default.publisher(for: .heartbeatInvalidHost)) { _ in
+				DispatchQueue.main.async {
+					UIAlertController.showAlertWithOk(
+						title: "InvalidHostID",
+						message: .localized("Your pairing file is invalid and is incompatible with your device, please import a valid pairing file.")
+					)
 				}
-				.onReceive(NotificationCenter.default.publisher(for: .heartbeatInvalidHost)) { _ in
-					DispatchQueue.main.async {
-						UIAlertController.showAlertWithOk(
-							title: "InvalidHostID",
-							message: .localized("Your pairing file is invalid and is incompatible with your device, please import a valid pairing file.")
-						)
-					}
+			}
+			// dear god help me
+			.onAppear {
+				if let style = UIUserInterfaceStyle(rawValue: UserDefaults.standard.integer(forKey: "Feather.userInterfaceStyle")) {
+					UIApplication.topViewController()?.view.window?.overrideUserInterfaceStyle = style
 				}
-				// dear god help me
-				.onAppear {
-					if let style = UIUserInterfaceStyle(rawValue: UserDefaults.standard.integer(forKey: "Feather.userInterfaceStyle")) {
-						UIApplication.topViewController()?.view.window?.overrideUserInterfaceStyle = style
-					}
 
-					UIApplication.topViewController()?.view.window?.tintColor = UIColor(Color(hex: UserDefaults.standard.string(forKey: "Feather.userTintColor") ?? "#848ef9"))
-				}
+				UIApplication.topViewController()?.view.window?.tintColor = UIColor(Color(hex: UserDefaults.standard.string(forKey: "Feather.userTintColor") ?? "#848ef9"))
+			}
 		}
 	}
 	

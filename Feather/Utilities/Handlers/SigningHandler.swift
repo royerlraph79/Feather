@@ -351,7 +351,7 @@ extension SigningHandler {
 	private func _removePresetFiles(for app: URL) async throws {
 		var files = [
 			"_CodeSignature", // Fallbaccck for some reason the locate doesnt work
-			"embedded.mobileprovision", // Remove this because zsign doesn't replace it
+			"embedded.mobileprovision", // Drop the vendor's profile; zsign writes ours back before sealing
 			"com.apple.WatchPlaceholder", // Useless
 			"SignedByEsign" // Useless
 		].map {
