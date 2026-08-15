@@ -7,7 +7,7 @@
 
 import SwiftUI
 import NimbleViews
-import Zsign
+import ZsignC
 
 // MARK: - View
 struct LibraryInfoView: View {
