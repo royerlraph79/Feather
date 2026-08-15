@@ -21,32 +21,37 @@ struct FeatherApp: App {
 	
 	var body: some Scene {
 		WindowGroup {
-			VStack(spacing: 0) {
-				DownloadHeaderView(downloadManager: downloadManager)
-				// No ambient animation out here: an .animation on this VStack also
-				// animates the tab view's resize when the header appears, and a
-				// TabView that resizes mid-tab-swap cross-dissolves the two tabs
-				// over each other. DownloadHeaderView animates its own insertion.
-				VariedTabbarView()
-					.environment(\.managedObjectContext, storage.context)
-					.onOpenURL(perform: _handleURL)
-			}
-			.onReceive(NotificationCenter.default.publisher(for: .heartbeatInvalidHost)) { _ in
-				DispatchQueue.main.async {
-					UIAlertController.showAlertWithOk(
-						title: "InvalidHostID",
-						message: .localized("Your pairing file is invalid and is incompatible with your device, please import a valid pairing file.")
-					)
+			VariedTabbarView()
+				.environment(\.managedObjectContext, storage.context)
+				.onOpenURL(perform: _handleURL)
+				// Overlaid, not stacked above. As a sibling in a VStack the header
+				// got its own opaque strip with nothing behind it, so its glass had
+				// nothing to refract and read as a flat dark band against the glass
+				// chrome below it. Overlaying puts the tab content behind it.
+				//
+				// It also keeps the header from resizing the tab view: a TabView
+				// that resizes while it swaps tabs cross-dissolves the two tabs over
+				// each other. DownloadHeaderView animates its own insertion, so no
+				// ambient .animation belongs out here either.
+				.overlay(alignment: .top) {
+					DownloadHeaderView(downloadManager: downloadManager)
 				}
-			}
-			// dear god help me
-			.onAppear {
-				if let style = UIUserInterfaceStyle(rawValue: UserDefaults.standard.integer(forKey: "Feather.userInterfaceStyle")) {
-					UIApplication.topViewController()?.view.window?.overrideUserInterfaceStyle = style
+				.onReceive(NotificationCenter.default.publisher(for: .heartbeatInvalidHost)) { _ in
+					DispatchQueue.main.async {
+						UIAlertController.showAlertWithOk(
+							title: "InvalidHostID",
+							message: .localized("Your pairing file is invalid and is incompatible with your device, please import a valid pairing file.")
+						)
+					}
 				}
-				
-				UIApplication.topViewController()?.view.window?.tintColor = UIColor(Color(hex: UserDefaults.standard.string(forKey: "Feather.userTintColor") ?? "#848ef9"))
-			}
+				// dear god help me
+				.onAppear {
+					if let style = UIUserInterfaceStyle(rawValue: UserDefaults.standard.integer(forKey: "Feather.userInterfaceStyle")) {
+						UIApplication.topViewController()?.view.window?.overrideUserInterfaceStyle = style
+					}
+
+					UIApplication.topViewController()?.view.window?.tintColor = UIColor(Color(hex: UserDefaults.standard.string(forKey: "Feather.userTintColor") ?? "#848ef9"))
+				}
 		}
 	}
 	
