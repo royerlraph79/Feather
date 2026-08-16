@@ -38,7 +38,13 @@ struct DownloadHeaderView: View {
 				// the title and the toolbar buttons. The card is what separates the
 				// two rows.
 				.modifier(DownloadHeaderSurface())
-				.padding(.horizontal, 16)
+				.padding(.leading, 16)
+				// Keep the trailing toolbar buttons tappable. That platter is
+				// anchored to the trailing edge -- 20pt inset, ~102pt wide for
+				// Library's refresh + add pair -- so its leading edge lands about
+				// 122pt from the right whatever the screen width is. 130 clears it
+				// with a gap, and works out the same on every device.
+				.padding(.trailing, 130)
 				.padding(.top, 4)
 				.transition(.move(edge: .top).combined(with: .opacity))
 			}
