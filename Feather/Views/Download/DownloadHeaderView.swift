@@ -50,13 +50,7 @@ struct DownloadHeaderView: View {
 				// the title and the toolbar buttons. The card is what separates the
 				// two rows.
 				.modifier(DownloadHeaderSurface())
-				.padding(.leading, 16)
-				// Keep the trailing toolbar buttons tappable. That platter is
-				// anchored to the trailing edge -- 20pt inset, ~102pt wide for
-				// Library's refresh + add pair -- so its leading edge lands about
-				// 122pt from the right whatever the screen width is. 130 clears it
-				// with a gap, and works out the same on every device.
-				.padding(.trailing, 130)
+				.padding(.horizontal, 16)
 				.padding(.top, 4)
 				.transition(.move(edge: .top).combined(with: .opacity))
 			}
@@ -77,61 +71,106 @@ extension View {
 	/// `_UILiquidLensView` beneath it, while the tab bar and navigation platters
 	/// in the same tree had theirs. Overlaid, the list renders behind it and the
 	/// same modifier draws as real Liquid Glass.
-	@ViewBuilder
 	func downloadHeaderInset() -> some View {
-		if #available(iOS 26, *) {
-			// iOS 26 uses the tab view's bottom accessory instead, which is the
-			// one placement that gets a system-supplied backdrop without covering
-			// anything.
-			self
-		} else {
-			overlay(alignment: .top) {
-				DownloadHeaderView(downloadManager: DownloadManager.shared)
-			}
-		}
-	}
-
-	/// Installs the download header as the tab view's bottom accessory (iOS 26).
-	///
-	/// This is the slot Music's mini-player uses. The system draws the glass and
-	/// scrolls tab content beneath it, so the header refracts without sitting on
-	/// top of the navigation bar the way the overlay has to.
-	@ViewBuilder
-	func downloadAccessory() -> some View {
-		if #available(iOS 26, *) {
-			modifier(DownloadAccessory(downloadManager: DownloadManager.shared))
-		} else {
-			self
-		}
+		modifier(DownloadHeaderPresentation(downloadManager: DownloadManager.shared))
 	}
 }
 
-@available(iOS 26, *)
-private struct DownloadAccessory: ViewModifier {
+/// Places the header above the navigation bar without starving its glass.
+///
+/// Apple's rule is that Liquid Glass "blurs content behind it", so the header
+/// only lenses where something renders underneath. Stacking it above the tab
+/// view puts it where nothing does, and the effect collapses to a flat fill --
+/// a FLEX capture of that build caught it as a `SwiftUI._UIInheritedView` on an
+/// `SDFLayer` with `opaque = YES` and no `_UILiquidLensView` beneath it.
+///
+/// So rather than move the header somewhere content already reaches, bring the
+/// content up to the header: grow the hosting controller's top safe area by the
+/// header's height. UIKit propagates that inset, so the navigation bar lays out
+/// below the header instead of under it, while the list keeps its frame at the
+/// top of the window and merely insets its content -- exactly how a list scrolls
+/// under a navigation bar. The header then has live content behind it and the
+/// same `glassEffect` renders as a real lens, with the layout unchanged.
+private struct DownloadHeaderPresentation: ViewModifier {
 	@ObservedObject var downloadManager: DownloadManager
+	@State private var headerHeight: CGFloat = 0
+	@State private var statusBarInset: CGFloat = 0
 
-	// No surface of its own: the accessory is already a system glass container,
-	// and stacking glass on glass is the case the HIG rules out.
-	@ViewBuilder
+	private var isShowing: Bool { !downloadManager.manualDownloads.isEmpty }
+
 	func body(content: Content) -> some View {
-		if #available(iOS 26.1, *) {
-			content.tabViewBottomAccessory(isEnabled: !downloadManager.manualDownloads.isEmpty) {
-				DownloadHeaderContent(downloadManager: downloadManager)
-					.padding(.horizontal, 16)
+		content
+			.overlay(alignment: .top) {
+				DownloadHeaderView(downloadManager: downloadManager)
+					.background {
+						GeometryReader { proxy in
+							Color.clear.preference(
+								key: DownloadHeaderHeightKey.self,
+								value: proxy.size.height
+							)
+						}
+					}
+					// Sit against the status bar, not the grown safe area. Without
+					// this the header slides down by the very inset it asks for,
+					// landing back on the navigation bar it was meant to clear.
+					.padding(.top, statusBarInset)
+					.ignoresSafeArea(.container, edges: .top)
 			}
-		} else if !downloadManager.manualDownloads.isEmpty {
-			// 26.0 has no isEnabled overload, so only attach the modifier while a
-			// download is running -- otherwise it reserves an empty bar above the
-			// tab bar for the whole session.
-			content.tabViewBottomAccessory {
-				DownloadHeaderContent(downloadManager: downloadManager)
-					.padding(.horizontal, 16)
+			.onPreferenceChange(DownloadHeaderHeightKey.self) { headerHeight = $0 }
+			.background(
+				RootSafeAreaTopInset(
+					inset: isShowing ? headerHeight : 0,
+					statusBarInset: $statusBarInset
+				)
+				.frame(width: 0, height: 0)
+			)
+	}
+}
+
+private struct DownloadHeaderHeightKey: PreferenceKey {
+	static var defaultValue: CGFloat = 0
+	static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+		value = max(value, nextValue())
+	}
+}
+
+/// Adds to the root view controller's top safe area.
+///
+/// `safeAreaInset`/`safeAreaBar` are not usable here: they adjust the SwiftUI
+/// safe area for their own children, but the navigation bar positions against
+/// the window's, so it never moves and the header ends up on top of it.
+/// `additionalSafeAreaInsets` changes the UIKit safe area the bar actually
+/// reads, which is what lets the bar drop below the header.
+private struct RootSafeAreaTopInset: UIViewRepresentable {
+	let inset: CGFloat
+	@Binding var statusBarInset: CGFloat
+
+	func makeUIView(context: Context) -> UIView {
+		let view = UIView()
+		view.isUserInteractionEnabled = false
+		return view
+	}
+
+	func updateUIView(_ uiView: UIView, context: Context) {
+		let inset = self.inset
+		DispatchQueue.main.async {
+			guard let window = uiView.window else { return }
+
+			// The window's own inset, which additionalSafeAreaInsets does not
+			// touch, so it stays the true status bar height and gives the header
+			// something stable to sit against.
+			let top = window.safeAreaInsets.top
+			if abs(statusBarInset - top) > 0.5 {
+				statusBarInset = top
 			}
-		} else {
-			content
+
+			guard let root = window.rootViewController else { return }
+			guard abs(root.additionalSafeAreaInsets.top - inset) > 0.5 else { return }
+			root.additionalSafeAreaInsets.top = inset
 		}
 	}
 }
+
 
 /// Backdrop for the download header.
 ///
