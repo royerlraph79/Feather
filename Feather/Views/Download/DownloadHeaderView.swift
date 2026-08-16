@@ -42,6 +42,33 @@ struct DownloadHeaderView: View {
 	}
 }
 
+extension View {
+	/// Insets the download header above this view's content.
+	///
+	/// Applied inside a tab's `NavigationStack`, so the header lands below the
+	/// navigation bar and search field rather than on top of them, and the list
+	/// scrolls underneath it. That last part is the point: Liquid Glass only
+	/// reads as glass where content passes beneath it, and the strip above the
+	/// navigation bar is the one place in this layout where none ever does.
+	@ViewBuilder
+	func downloadHeaderInset() -> some View {
+		if #available(iOS 26, *) {
+			// safeAreaBar, not safeAreaInset: it pins the header the way the search
+			// field and toolbar pills are pinned, with the list scrolling beneath
+			// rather than stopping at its edge. That is the whole difference --
+			// the material was always Liquid Glass, it just had nothing passing
+			// under it to refract.
+			safeAreaBar(edge: .top, spacing: 0) {
+				DownloadHeaderView(downloadManager: DownloadManager.shared)
+			}
+		} else {
+			safeAreaInset(edge: .top, spacing: 0) {
+				DownloadHeaderView(downloadManager: DownloadManager.shared)
+			}
+		}
+	}
+}
+
 /// Backdrop for the download header.
 ///
 /// The header is transient chrome floating above the tab content, so it belongs

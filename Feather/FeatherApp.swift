@@ -21,25 +21,16 @@ struct FeatherApp: App {
 	
 	var body: some Scene {
 		WindowGroup {
-			// Stacked, not overlaid. Overlaying let the tab content show through the
-			// header's glass, but it also covered the navigation bar -- Edit, the
-			// refresh and add buttons, and the search field all sat underneath it and
-			// could not be tapped. safeAreaInset does not help: applied to this
-			// TabView it leaves the navigation bar where it is and behaves like an
-			// overlay, because the bar positions itself against the window's safe
-			// area rather than the tab view's. Stacking is what actually moves the
-			// bar down out of the way.
-			//
-			// No ambient .animation out here: one on this VStack also animates the
-			// tab view's resize when the header appears, and a TabView that resizes
-			// mid-tab-swap cross-dissolves the two tabs over each other.
-			// DownloadHeaderView animates its own insertion.
-			VStack(spacing: 0) {
-				DownloadHeaderView(downloadManager: downloadManager)
-				VariedTabbarView()
-					.environment(\.managedObjectContext, storage.context)
-					.onOpenURL(perform: _handleURL)
-			}
+			// The download header is inset inside each tab's NavigationStack via
+			// downloadHeaderInset(), so the list scrolls beneath it and its glass
+			// has something to refract. Keep this root free of any ambient
+			// .animation: one here also animates the tab view's resize when the
+			// header appears, and a TabView that resizes mid-tab-swap
+			// cross-dissolves the two tabs over each other. DownloadHeaderView
+			// animates its own insertion.
+			VariedTabbarView()
+				.environment(\.managedObjectContext, storage.context)
+				.onOpenURL(perform: _handleURL)
 			.onReceive(NotificationCenter.default.publisher(for: .heartbeatInvalidHost)) { _ in
 				DispatchQueue.main.async {
 					UIAlertController.showAlertWithOk(

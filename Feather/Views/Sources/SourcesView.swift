@@ -108,6 +108,7 @@ struct SourcesView: View {
 			.sheet(isPresented: $_isAddingPresenting) {
 				SourcesAddView()
 			}
+			.downloadHeaderInset()
 		}
 		.task(id: Array(_sources)) {
 			await viewModel.fetchSources(_sources)
