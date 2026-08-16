@@ -51,7 +51,6 @@ struct DownloadHeaderView: View {
 				// two rows.
 				.modifier(DownloadHeaderSurface())
 				.padding(.horizontal, 16)
-				.padding(.top, 4)
 				.transition(.move(edge: .top).combined(with: .opacity))
 			}
 		}
@@ -190,7 +189,14 @@ private struct DownloadHeaderSurface: ViewModifier {
 	@ViewBuilder
 	func body(content: Content) -> some View {
 		if #available(iOS 26, *) {
-			content.glassEffect(.regular, in: shape)
+			// Inside a GlassEffectContainer, per Apple: "each view with the
+			// glassEffect(_:in:) modifier renders with the effects behind it",
+			// and effects "render differently depending on container presence".
+			// Standalone, the modifier only blurs -- the lensing needs the
+			// container's rendering pass.
+			GlassEffectContainer {
+				content.glassEffect(.regular, in: shape)
+			}
 		} else {
 			// Deployment target is iOS 16, so pre-26 needs a real backdrop of its
 			// own — without one the header reads as loose text over the content.
