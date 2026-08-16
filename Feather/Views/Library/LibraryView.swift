@@ -237,7 +237,6 @@ struct LibraryView: View {
 			.onChange(of: updateManager.isChecking) { isChecking in
 				_handleUpdateCheckStateChange(isChecking)
 			}
-			.downloadHeaderInset()
 		}
 	}
 }

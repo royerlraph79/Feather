@@ -21,16 +21,14 @@ struct FeatherApp: App {
 	
 	var body: some Scene {
 		WindowGroup {
-			// The download header is inset inside each tab's NavigationStack via
-			// downloadHeaderInset(), so the list scrolls beneath it and its glass
-			// has something to refract. Keep this root free of any ambient
-			// .animation: one here also animates the tab view's resize when the
-			// header appears, and a TabView that resizes mid-tab-swap
-			// cross-dissolves the two tabs over each other. DownloadHeaderView
-			// animates its own insertion.
+			// Keep this root free of any ambient .animation: one here also animates
+			// the tab view's resize when the header appears, and a TabView that
+			// resizes mid-tab-swap cross-dissolves the two tabs over each other.
+			// DownloadHeaderView animates its own insertion.
 			VariedTabbarView()
 				.environment(\.managedObjectContext, storage.context)
 				.onOpenURL(perform: _handleURL)
+				.downloadHeaderInset()
 			.onReceive(NotificationCenter.default.publisher(for: .heartbeatInvalidHost)) { _ in
 				DispatchQueue.main.async {
 					UIAlertController.showAlertWithOk(

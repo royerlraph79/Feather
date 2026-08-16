@@ -32,6 +32,11 @@ struct DownloadHeaderView: View {
 				}
 				.padding(.horizontal, 16)
 				.padding(.vertical, 12)
+				// Keeps its own surface. Dropping it and letting safeAreaBar's blur
+				// carry the header does avoid stacking glass, but with the bar
+				// pinned over the navigation row the bare text then collides with
+				// the title and the toolbar buttons. The card is what separates the
+				// two rows.
 				.modifier(DownloadHeaderSurface())
 				.padding(.horizontal, 16)
 				.padding(.top, 4)
