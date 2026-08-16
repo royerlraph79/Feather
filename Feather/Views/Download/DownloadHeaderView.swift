@@ -9,27 +9,39 @@ import SwiftUI
 import Combine
 import NimbleExtensions
 
+/// The header's contents on their own, with no surface or placement.
+///
+/// Shared by both presentations: the pre-26 overlay, which supplies its own
+/// glass, and the iOS 26 tab view accessory, where the system supplies it.
+struct DownloadHeaderContent: View {
+	@ObservedObject var downloadManager: DownloadManager
+
+	var body: some View {
+		VStack(spacing: 12) {
+			if let firstDownload = downloadManager.manualDownloads.first {
+				DownloadItemView(download: firstDownload)
+
+				if downloadManager.manualDownloads.count > 1 {
+					HStack {
+						Spacer()
+						Text(verbatim: "+\(downloadManager.manualDownloads.count - 1)")
+							.font(.caption)
+							.foregroundColor(.secondary)
+							.padding(.vertical, 4)
+					}
+				}
+			}
+		}
+	}
+}
+
 struct DownloadHeaderView: View {
 	@ObservedObject var downloadManager: DownloadManager
-	
+
 	var body: some View {
 		ZStack {
 			if !downloadManager.manualDownloads.isEmpty {
-				VStack(spacing: 12) {
-					if let firstDownload = downloadManager.manualDownloads.first {
-						DownloadItemView(download: firstDownload)
-
-						if downloadManager.manualDownloads.count > 1 {
-							HStack {
-								Spacer()
-								Text(verbatim: "+\(downloadManager.manualDownloads.count - 1)")
-									.font(.caption)
-									.foregroundColor(.secondary)
-									.padding(.vertical, 4)
-							}
-						}
-					}
-				}
+				DownloadHeaderContent(downloadManager: downloadManager)
 				.padding(.horizontal, 16)
 				.padding(.vertical, 12)
 				// Keeps its own surface. Dropping it and letting safeAreaBar's blur
@@ -54,27 +66,69 @@ struct DownloadHeaderView: View {
 }
 
 extension View {
-	/// Insets the download header above this view's content.
+	/// Floats the download header over this view, for releases without
+	/// `tabViewBottomAccessory`.
 	///
-	/// Applied inside a tab's `NavigationStack`, so the header lands below the
-	/// navigation bar and search field rather than on top of them, and the list
-	/// scrolls underneath it. That last part is the point: Liquid Glass only
-	/// reads as glass where content passes beneath it, and the strip above the
-	/// navigation bar is the one place in this layout where none ever does.
-	/// Floats the download header over this view.
-	///
-	/// Overlay, not safeAreaInset or safeAreaBar. Both of those place the header
-	/// where the tab content does not reach, and `glassEffect` with no backdrop
-	/// to sample collapses to an opaque fill -- a FLEX capture of that build
-	/// shows the header as a bare `SwiftUI._UIInheritedView` on an `SDFLayer`
-	/// with `opaque = YES`, no `_UILiquidLensView` under it, while the tab bar
-	/// and navigation platters in the same tree do have theirs.
-	///
-	/// Overlaid, the list renders behind the header, `glassEffect` has something
-	/// to lens, and it draws as real Liquid Glass.
+	/// Overlay rather than safeAreaInset or safeAreaBar: both of those put the
+	/// header where the tab content does not reach, and a backdrop with nothing
+	/// rendered under it blurs to a flat fill. A FLEX capture of the safeAreaBar
+	/// build caught exactly that -- the header as a bare
+	/// `SwiftUI._UIInheritedView` on an `SDFLayer` with `opaque = YES` and no
+	/// `_UILiquidLensView` beneath it, while the tab bar and navigation platters
+	/// in the same tree had theirs. Overlaid, the list renders behind it and the
+	/// same modifier draws as real Liquid Glass.
+	@ViewBuilder
 	func downloadHeaderInset() -> some View {
-		overlay(alignment: .top) {
-			DownloadHeaderView(downloadManager: DownloadManager.shared)
+		if #available(iOS 26, *) {
+			// iOS 26 uses the tab view's bottom accessory instead, which is the
+			// one placement that gets a system-supplied backdrop without covering
+			// anything.
+			self
+		} else {
+			overlay(alignment: .top) {
+				DownloadHeaderView(downloadManager: DownloadManager.shared)
+			}
+		}
+	}
+
+	/// Installs the download header as the tab view's bottom accessory (iOS 26).
+	///
+	/// This is the slot Music's mini-player uses. The system draws the glass and
+	/// scrolls tab content beneath it, so the header refracts without sitting on
+	/// top of the navigation bar the way the overlay has to.
+	@ViewBuilder
+	func downloadAccessory() -> some View {
+		if #available(iOS 26, *) {
+			modifier(DownloadAccessory(downloadManager: DownloadManager.shared))
+		} else {
+			self
+		}
+	}
+}
+
+@available(iOS 26, *)
+private struct DownloadAccessory: ViewModifier {
+	@ObservedObject var downloadManager: DownloadManager
+
+	// No surface of its own: the accessory is already a system glass container,
+	// and stacking glass on glass is the case the HIG rules out.
+	@ViewBuilder
+	func body(content: Content) -> some View {
+		if #available(iOS 26.1, *) {
+			content.tabViewBottomAccessory(isEnabled: !downloadManager.manualDownloads.isEmpty) {
+				DownloadHeaderContent(downloadManager: downloadManager)
+					.padding(.horizontal, 16)
+			}
+		} else if !downloadManager.manualDownloads.isEmpty {
+			// 26.0 has no isEnabled overload, so only attach the modifier while a
+			// download is running -- otherwise it reserves an empty bar above the
+			// tab bar for the whole session.
+			content.tabViewBottomAccessory {
+				DownloadHeaderContent(downloadManager: downloadManager)
+					.padding(.horizontal, 16)
+			}
+		} else {
+			content
 		}
 	}
 }
