@@ -112,7 +112,11 @@ private struct DownloadHeaderPresentation: ViewModifier {
 					// Sit against the status bar, not the grown safe area. Without
 					// this the header slides down by the very inset it asks for,
 					// landing back on the navigation bar it was meant to clear.
-					.padding(.top, statusBarInset)
+					//
+					// The window inset clears the Dynamic Island and then adds a
+					// margin; pulling that margin back puts the card flush under
+					// the island so no strip of content shows between them.
+					.padding(.top, max(statusBarInset - 12, 0))
 					.ignoresSafeArea(.container, edges: .top)
 			}
 			.onPreferenceChange(DownloadHeaderHeightKey.self) { headerHeight = $0 }
@@ -189,19 +193,43 @@ private struct DownloadHeaderSurface: ViewModifier {
 	@ViewBuilder
 	func body(content: Content) -> some View {
 		if #available(iOS 26, *) {
-			// Inside a GlassEffectContainer, per Apple: "each view with the
-			// glassEffect(_:in:) modifier renders with the effects behind it",
-			// and effects "render differently depending on container presence".
-			// Standalone, the modifier only blurs -- the lensing needs the
-			// container's rendering pass.
-			GlassEffectContainer {
-				content.glassEffect(.regular, in: shape)
+			// UIKit's UIGlassEffect rather than SwiftUI's glassEffect. The search
+			// field and toolbar platters render through UIVisualEffectView, and
+			// that is the look being matched here; SwiftUI's modifier resolved to
+			// a SwiftUI._UIInheritedView on an SDFLayer in a FLEX capture, with no
+			// lens view, and read as an ordinary blur on device.
+			content.background {
+				SystemGlassBackdrop(cornerRadius: 22)
 			}
 		} else {
 			// Deployment target is iOS 16, so pre-26 needs a real backdrop of its
 			// own — without one the header reads as loose text over the content.
 			content.background(.regularMaterial, in: shape)
 		}
+	}
+}
+
+/// The system glass material, via UIKit.
+///
+/// `UIGlassEffect` is a `UIVisualEffect`, so this renders through a real
+/// `UIVisualEffectView` backdrop -- the same path the navigation platters and
+/// the search field take. SwiftUI's `glassEffect(_:in:)` resolves to its own
+/// SDF-based rendering instead, which reads as a plain blur here.
+@available(iOS 26, *)
+private struct SystemGlassBackdrop: UIViewRepresentable {
+	let cornerRadius: CGFloat
+
+	func makeUIView(context: Context) -> UIVisualEffectView {
+		let view = UIVisualEffectView(effect: UIGlassEffect(style: .regular))
+		view.isUserInteractionEnabled = false
+		view.clipsToBounds = true
+		view.layer.cornerRadius = cornerRadius
+		view.layer.cornerCurve = .continuous
+		return view
+	}
+
+	func updateUIView(_ uiView: UIVisualEffectView, context: Context) {
+		uiView.layer.cornerRadius = cornerRadius
 	}
 }
 
