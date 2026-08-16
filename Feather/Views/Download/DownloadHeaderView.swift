@@ -55,21 +55,20 @@ extension View {
 	/// scrolls underneath it. That last part is the point: Liquid Glass only
 	/// reads as glass where content passes beneath it, and the strip above the
 	/// navigation bar is the one place in this layout where none ever does.
-	@ViewBuilder
+	/// Floats the download header over this view.
+	///
+	/// Overlay, not safeAreaInset or safeAreaBar. Both of those place the header
+	/// where the tab content does not reach, and `glassEffect` with no backdrop
+	/// to sample collapses to an opaque fill -- a FLEX capture of that build
+	/// shows the header as a bare `SwiftUI._UIInheritedView` on an `SDFLayer`
+	/// with `opaque = YES`, no `_UILiquidLensView` under it, while the tab bar
+	/// and navigation platters in the same tree do have theirs.
+	///
+	/// Overlaid, the list renders behind the header, `glassEffect` has something
+	/// to lens, and it draws as real Liquid Glass.
 	func downloadHeaderInset() -> some View {
-		if #available(iOS 26, *) {
-			// safeAreaBar, not safeAreaInset: it pins the header the way the search
-			// field and toolbar pills are pinned, with the list scrolling beneath
-			// rather than stopping at its edge. That is the whole difference --
-			// the material was always Liquid Glass, it just had nothing passing
-			// under it to refract.
-			safeAreaBar(edge: .top, spacing: 0) {
-				DownloadHeaderView(downloadManager: DownloadManager.shared)
-			}
-		} else {
-			safeAreaInset(edge: .top, spacing: 0) {
-				DownloadHeaderView(downloadManager: DownloadManager.shared)
-			}
+		overlay(alignment: .top) {
+			DownloadHeaderView(downloadManager: DownloadManager.shared)
 		}
 	}
 }
