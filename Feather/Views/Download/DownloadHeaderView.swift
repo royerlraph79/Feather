@@ -116,7 +116,7 @@ private struct DownloadHeaderPresentation: ViewModifier {
 					// The window inset clears the Dynamic Island and then adds a
 					// margin; pulling that margin back puts the card flush under
 					// the island so no strip of content shows between them.
-					.padding(.top, max(statusBarInset - 12, 0))
+					.padding(.top, max(statusBarInset - 6, 0))
 					.ignoresSafeArea(.container, edges: .top)
 			}
 			.onPreferenceChange(DownloadHeaderHeightKey.self) { headerHeight = $0 }
@@ -219,17 +219,47 @@ private struct DownloadHeaderSurface: ViewModifier {
 private struct SystemGlassBackdrop: UIViewRepresentable {
 	let cornerRadius: CGFloat
 
+	final class Coordinator {
+		var glass: UIVisualEffectView?
+	}
+
+	func makeCoordinator() -> Coordinator { Coordinator() }
+
 	func makeUIView(context: Context) -> UIVisualEffectView {
-		let view = UIVisualEffectView(effect: UIGlassEffect(style: .regular))
-		view.isUserInteractionEnabled = false
-		view.clipsToBounds = true
-		view.layer.cornerRadius = cornerRadius
-		view.layer.cornerCurve = .continuous
-		return view
+		// Per UIGlassEffect.h: with UIGlassContainerEffect "you can add individual
+		// glass elements to the visual effect view's contentView by nesting
+		// UIVisualEffectView's configured with UIGlassEffect. In that
+		// configuration, the glass container will render all glass elements in one
+		// combined view".
+		//
+		// That nesting is what composes glass. A lone UIGlassEffect view only adds
+		// a _UIVisualEffectBackdropView -- a blur -- which is what a FLEX capture
+		// of the previous build showed, with no _UILiquidLensView of the kind the
+		// navigation platters and tab bar carry.
+		let container = UIVisualEffectView(effect: UIGlassContainerEffect())
+		container.isUserInteractionEnabled = false
+
+		let glass = UIVisualEffectView(effect: UIGlassEffect(style: .regular))
+		glass.isUserInteractionEnabled = false
+		glass.clipsToBounds = true
+		glass.layer.cornerRadius = cornerRadius
+		glass.layer.cornerCurve = .continuous
+		glass.translatesAutoresizingMaskIntoConstraints = false
+		container.contentView.addSubview(glass)
+
+		NSLayoutConstraint.activate([
+			glass.leadingAnchor.constraint(equalTo: container.contentView.leadingAnchor),
+			glass.trailingAnchor.constraint(equalTo: container.contentView.trailingAnchor),
+			glass.topAnchor.constraint(equalTo: container.contentView.topAnchor),
+			glass.bottomAnchor.constraint(equalTo: container.contentView.bottomAnchor)
+		])
+
+		context.coordinator.glass = glass
+		return container
 	}
 
 	func updateUIView(_ uiView: UIVisualEffectView, context: Context) {
-		uiView.layer.cornerRadius = cornerRadius
+		context.coordinator.glass?.layer.cornerRadius = cornerRadius
 	}
 }
 
