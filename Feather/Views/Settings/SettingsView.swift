@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CoreData
 import NimbleViews
 import UIKit
 import Darwin

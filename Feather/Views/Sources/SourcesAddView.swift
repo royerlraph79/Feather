@@ -17,7 +17,6 @@ struct SourcesAddView: View {
 	typealias RepositoryDataHandler = Result<ASRepository, Error>
 	@Environment(\.dismiss) var dismiss
 
-	private let _dataService = NBFetchService()
 	
 	@State private var _filteredRecommendedSourcesData: [(url: URL, data: ASRepository)] = []
 	private func _refreshFilteredRecommendedSourcesData() {
@@ -183,32 +182,32 @@ struct SourcesAddView: View {
 	private func _concurrentFetchRepositories(
 		from urls: [URL]
 	) async -> [(url: URL, data: ASRepository)] {
-		var results: [(url: URL, data: ASRepository)] = []
-		
-		let dataService = _dataService
-		
-		await withTaskGroup(of: Void.self) { group in
-			for url in urls {
+		await withTaskGroup(of: (Int, ASRepository?).self) { group in
+			for (index, url) in urls.enumerated() {
 				group.addTask {
-					await withCheckedContinuation { continuation in
-						dataService.fetch<ASRepository>(from: url) { (result: RepositoryDataHandler) in
+					let repo: ASRepository? = await withCheckedContinuation { continuation in
+						NBFetchService().fetch(from: url) { (result: RepositoryDataHandler) in
 							switch result {
-							case .success(let repo):
-								Task { @MainActor in
-									results.append((url: url, data: repo))
-								}
+							case .success(let repository):
+								continuation.resume(returning: repository)
 							case .failure(let error):
 								Logger.misc.error("Failed to fetch \(url): \(error.localizedDescription)")
+								continuation.resume(returning: nil)
 							}
-							continuation.resume()
 						}
 					}
+					return (index, repo)
 				}
 			}
-			await group.waitForAll()
+
+			var fetched: [(Int, ASRepository)] = []
+			for await (index, repo) in group {
+				if let repo {
+					fetched.append((index, repo))
+				}
+			}
+			return fetched.sorted { $0.0 < $1.0 }.map { (url: urls[$0.0], data: $0.1) }
 		}
-		
-		return results
 	}
 
 }

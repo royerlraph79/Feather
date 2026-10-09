@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import CoreData
 import NukeUI
 
 @available(iOS 18, *)

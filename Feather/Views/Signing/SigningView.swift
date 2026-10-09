@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CoreData
 import PhotosUI
 import NimbleViews
 
