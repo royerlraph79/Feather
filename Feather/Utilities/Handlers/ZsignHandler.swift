@@ -44,7 +44,7 @@ final class ZsignHandler {
 			throw SigningFileHandlerError.missingCertifcate
 		}
 
-		let _ = Zsign.sign(
+		let succeeded = Zsign.sign(
 			appPath: _appUrl.relativePath,
 			provisionPath: Storage.shared.getFile(.provision, from: cert)?.path ?? "",
 			p12Path: Storage.shared.getFile(.certificate, from: cert)?.path ?? "",
@@ -57,10 +57,11 @@ final class ZsignHandler {
 				}
 			}
 		)
+		guard succeeded else { throw SigningFileHandlerError.signFailed }
 	}
 	
 	func adhocSign() async throws {
-		let _ = Zsign.sign(
+		let succeeded = Zsign.sign(
 			appPath: _appUrl.relativePath,
 			entitlementsPath: _options.appEntitlementsFile?.path ?? "",
 			adhoc: true,
@@ -71,5 +72,6 @@ final class ZsignHandler {
 				}
 			}
 		)
+		guard succeeded else { throw SigningFileHandlerError.signFailed }
 	}
 }
