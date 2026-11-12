@@ -25,6 +25,7 @@ struct LibraryView: View {
 	
 	// MARK: Selection State
 	@State private var _selectedAppUUIDs: Set<String> = []
+	@State private var _pendingSwipeDeletionUUIDs: Set<String> = []
 	@State private var _editMode: EditMode = .inactive
 	
 	@State private var _searchText = ""
@@ -36,7 +37,11 @@ struct LibraryView: View {
 	// horror
 	private func filteredAndSortedApps<T>(from apps: FetchedResults<T>) -> [T] where T: NSManagedObject {
 		apps.filter {
-			_searchText.isEmpty ||
+			if let uuid = $0.value(forKey: "uuid") as? String,
+				_pendingSwipeDeletionUUIDs.contains(uuid) {
+				return false
+			}
+			return _searchText.isEmpty ||
 				(($0.value(forKey: "name") as? String)?.localizedCaseInsensitiveContains(_searchText) ?? false)
 		}
 	}
@@ -86,7 +91,8 @@ struct LibraryView: View {
 								selectedInfoAppPresenting: $_selectedInfoAppPresenting,
 								selectedSigningAppPresenting: $_selectedSigningAppPresenting,
 								selectedInstallAppPresenting: $_selectedInstallAppPresenting,
-								selectedAppUUIDs: $_selectedAppUUIDs
+								selectedAppUUIDs: $_selectedAppUUIDs,
+								onSwipeDelete: _swipeDeleteApp
 							)
 							.compatMatchedTransitionSource(id: app.uuid ?? "", ns: _namespace)
 						}
@@ -107,7 +113,8 @@ struct LibraryView: View {
 								selectedInfoAppPresenting: $_selectedInfoAppPresenting,
 								selectedSigningAppPresenting: $_selectedSigningAppPresenting,
 								selectedInstallAppPresenting: $_selectedInstallAppPresenting,
-								selectedAppUUIDs: $_selectedAppUUIDs
+								selectedAppUUIDs: $_selectedAppUUIDs,
+								onSwipeDelete: _swipeDeleteApp
 							)
 							.compatMatchedTransitionSource(id: app.uuid ?? "", ns: _namespace)
 						}
@@ -256,6 +263,24 @@ extension LibraryView {
 
 // MARK: - Extension: Bulk Delete
 extension LibraryView {
+	private func _swipeDeleteApp(_ app: AppInfoPresentable) {
+		guard let uuid = app.uuid else { return }
+		guard !_pendingSwipeDeletionUUIDs.contains(uuid) else { return }
+
+		// Keep the managed object alive while SwiftUI finishes the destructive swipe.
+		withAnimation(.snappy) {
+			_pendingSwipeDeletionUUIDs.insert(uuid)
+		}
+
+		Task { @MainActor in
+			try? await Task.sleep(for: .milliseconds(450))
+			Storage.shared.deleteApp(for: app)
+			// Give the fetch request time to remove the object before clearing the UI guard.
+			try? await Task.sleep(for: .milliseconds(150))
+			_pendingSwipeDeletionUUIDs.remove(uuid)
+		}
+	}
+
 	private func _bulkDeleteSelectedApps() {
 		let selectedApps = _getAllApps().filter { app in
 			guard let uuid = app.uuid else { return false }

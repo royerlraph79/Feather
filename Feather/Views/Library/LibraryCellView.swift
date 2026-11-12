@@ -30,6 +30,7 @@ struct LibraryCellView: View {
 	@Binding var selectedSigningAppPresenting: AnyApp?
 	@Binding var selectedInstallAppPresenting: AnyApp?
 	@Binding var selectedAppUUIDs: Set<String>
+	var onSwipeDelete: (AppInfoPresentable) -> Void
 	
 	// MARK: Selections
 	private var _isSelected: Bool {
@@ -88,9 +89,11 @@ struct LibraryCellView: View {
 				_toggleSelection()
 			}
 		}
-		.swipeActions {
+		.swipeActions(edge: .trailing, allowsFullSwipe: true) {
 			if !isEditing {
-				_actions(for: app)
+				Button(.localized("Delete"), systemImage: "trash", role: .destructive) {
+					onSwipeDelete(app)
+				}
 			}
 		}
 		.contextMenu {
